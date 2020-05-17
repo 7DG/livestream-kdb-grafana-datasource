@@ -58,6 +58,7 @@ export class KDBQueryCtrl extends QueryCtrl {
     liveTableSegment: any;
     liveTimeColumnSegment: any;
     liveMetricColumnSegment: any;
+    liveGroupingSegment: any;
     //LiveStream Grouping Parts
     liveSelectParts: SqlPart[][];
     liveGroupParts: SqlPart[];
@@ -255,11 +256,11 @@ export class KDBQueryCtrl extends QueryCtrl {
         else {
             this.liveTableSegment = this.uiSegmentSrv.newSegment({value: this.target.liveTable, fake: false});
         }
-        if(!this.target.groupingField) {
-            this.groupingSegment = this.uiSegmentSrv.newSegment({value: 'Select Field', fake: true});
+        if(!this.target.liveGroupingField) {
+            this.liveGroupingSegment = this.uiSegmentSrv.newSegment({value: 'Select Field', fake: true});
         }
         else {
-            this.groupingSegment = this.uiSegmentSrv.newSegment({value:this.target.groupingField, fake: false});
+            this.groupingSegment = this.uiSegmentSrv.newSegment({value:this.target.liveGroupingField, fake: false});
         }
         //if the select field is empty then initialise it
         if(!this.target.liveSelect){
@@ -278,10 +279,10 @@ export class KDBQueryCtrl extends QueryCtrl {
         this.liveTimeColumnSegment.html = segment.html;
         this.liveTimeColumnSegment.value = segment.value;
         this.target.liveTimeColumn = segment.value;
-        //this.liveGroupingSegment.html = segment.html;       NOT CURRENTLY SUPPORTING GROUPING OR CONFLATION ON LIVESTREAM DATA
-        //this.liveGroupingSegment.value = segment.value;     NOT CURRENTLY SUPPORTING GROUPING OR CONFLATION ON LIVESTREAM DATA
-        //this.target.liveGroupingField = segment.value;      NOT CURRENTLY SUPPORTING GROUPING OR CONFLATION ON LIVESTREAM DATA
-        //this.target.useLiveGrouping = false;                NOT CURRENTLY SUPPORTING GROUPING OR CONFLATION ON LIVESTREAM DATA
+        this.liveGroupingSegment.html = segment.html;
+        this.liveGroupingSegment.value = segment.value;
+        this.target.liveGroupingField = segment.value;
+        this.target.useLiveGrouping = false;
 
         this.updateProjection();
         this.panelCtrl.refresh();
@@ -300,6 +301,11 @@ export class KDBQueryCtrl extends QueryCtrl {
         this.panelCtrl.refresh(); 
     }
 
+    liveGroupingChanged() {
+        this.target.liveGroupingField = this.liveGroupingSegment.value;
+        this.panelCtrl.refresh();
+    }
+
     addLiveWhereAction(part, index) {
         this.liveWhereParts.push(sqlPart.create({type: 'expression', params: ['select field', '=', 'enter value']}));  
         this.updatePersistedParts();
@@ -307,7 +313,7 @@ export class KDBQueryCtrl extends QueryCtrl {
         this.panelCtrl.refresh();
     }
 
-    LiveStreamSubscribeChanged() {
+    liveStreamSubscribeChanged() {
         if (this.target.LiveStreamSubscribe) {
             
         } else {
@@ -831,6 +837,9 @@ export class KDBQueryCtrl extends QueryCtrl {
     //This function runs when the 'useGrouping' checkbox is toggled
     groupingToggled() {
         if(this.target.queryType == 'functionQuery') this.functionChanged();
+        //////////////////////////// LIVE STREAM DEV CODE /////////////////////////
+        if(this.target.queryType == 'liveStreamQuery') this.liveStreamSubscribeChanged();
+        //////////////////////// END OF LIVE STREAM DEV CODE //////////////////////
         this.panelCtrl.refresh();
         //this.refresh();
     }
