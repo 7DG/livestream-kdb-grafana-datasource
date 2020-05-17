@@ -47,12 +47,21 @@ export class KDBQueryCtrl extends QueryCtrl {
     selectMenu: any[];
     groupMenu: any[];
     aggMenu: any[];
-    durationUnits: any[]
+    durationUnits: any[];
 
     //Grouping Parts
     selectParts: SqlPart[][];
     groupParts: SqlPart[];
-    whereParts: SqlPart[]
+    whereParts: SqlPart[];
+
+    //LiveStream Segments
+    liveTableSegment: any;
+    liveTimeColumnSegment: any;
+    liveMetricColumnSegment: any;
+    //LiveStream Grouping Parts
+    liveSelectParts: SqlPart[][];
+    liveGroupParts: SqlPart[];
+    liveWhereParts: SqlPart[];
 
     kdbFunction: string;
 
@@ -95,6 +104,7 @@ export class KDBQueryCtrl extends QueryCtrl {
         this.queryTypes = [
             {text: 'Built Query', value: 'selectQuery'},
             {text: 'Free-form Query', value: 'functionQuery'},
+            {text: 'LiveStream Query (Beta)', value: 'liveStreamQuery'}
             //{text: 'Function', value: 'kdbSideQuery'}
         ];
 
@@ -152,6 +162,8 @@ export class KDBQueryCtrl extends QueryCtrl {
             this.buildQueryBuilderPanel();
         } else if(this.target.queryType == 'functionQuery'){
             this.buildFunctionQueryPanel();
+        } else if(this.target.queryType == 'liveStreamQuery'){
+            this.buildLiveStreamPanel();
         } else this.buildQueryBuilderPanel();
     }
 
@@ -210,6 +222,101 @@ export class KDBQueryCtrl extends QueryCtrl {
         this.setupAdditionalMenu();
     }
 
+
+/////////////////////////////////  LIVE STREAM DEV CODE //////////////////////////////
+
+    //This function builds the datasource if the panel type is a graph
+    buildLiveStreamPanel() {
+        //default to query builder
+        this.liveMetricColumnSegment = this.uiSegmentSrv.newSegment('dummy');
+
+        if(!this.target.liveTimeColumn || this.target.liveTimeColumn == 'Select Field'){
+            this.liveTimeColumnSegment = this.uiSegmentSrv.newSegment('Select Field');
+        }
+        //else populate the pre-existing value
+        else {
+            this.liveTimeColumnSegment = this.uiSegmentSrv.newSegment(this.target.liveTimeColumn);
+        }
+
+        //If queryError isn't present, build it
+        if(!this.target.queryError) {
+            this.target.queryError = {
+                //Errors present: From(table), conflation, Row Count, funcGroupCol
+                error: [false,false,false,false],
+                message: ['','','','']
+            };
+        }
+          
+        //Live table field
+        if(!this.target.liveTable || this.target.liveTable == 'Select Table'){
+            this.liveTableSegment = this.uiSegmentSrv.newSegment({value: 'Select Table', fake: true});
+        }
+        //else populate the pre-existing value      this.target.liveTable
+        else {
+            this.liveTableSegment = this.uiSegmentSrv.newSegment({value: this.target.liveTable, fake: false});
+        }
+        if(!this.target.groupingField) {
+            this.groupingSegment = this.uiSegmentSrv.newSegment({value: 'Select Field', fake: true});
+        }
+        else {
+            this.groupingSegment = this.uiSegmentSrv.newSegment({value:this.target.groupingField, fake: false});
+        }
+        //if the select field is empty then initialise it
+        if(!this.target.liveSelect){
+            this.target.liveSelect = [[{type: 'column', params: ['Select Live Stream Column']}]];
+        }
+
+        this.whereAdd = this.uiSegmentSrv.newPlusButton();
+        this.setupAdditionalMenu();
+    }
+
+    onLiveTableChanged() {
+        this.target.liveTable = this.liveTableSegment.value;
+        this.target.liveSelect = [[{type: 'column', params: ['select column']}]];
+        this.target.liveWhere = [];
+        const segment = this.uiSegmentSrv.newSegment('Select Field');
+        this.liveTimeColumnSegment.html = segment.html;
+        this.liveTimeColumnSegment.value = segment.value;
+        this.target.liveTimeColumn = segment.value;
+        //this.liveGroupingSegment.html = segment.html;       NOT CURRENTLY SUPPORTING GROUPING OR CONFLATION ON LIVESTREAM DATA
+        //this.liveGroupingSegment.value = segment.value;     NOT CURRENTLY SUPPORTING GROUPING OR CONFLATION ON LIVESTREAM DATA
+        //this.target.liveGroupingField = segment.value;      NOT CURRENTLY SUPPORTING GROUPING OR CONFLATION ON LIVESTREAM DATA
+        //this.target.useLiveGrouping = false;                NOT CURRENTLY SUPPORTING GROUPING OR CONFLATION ON LIVESTREAM DATA
+
+        this.updateProjection();
+        this.panelCtrl.refresh();
+    
+    }
+
+    liveTimeColumnChanged() {
+        this.target.liveTimeColumn = this.liveTimeColumnSegment.value;
+        this.datasource.metricFindQuery(this.metaBuilder.buildDatatypeQuery(this.target.liveTimeColumn)).then(result => {
+            if (Array.isArray(result)) {
+                if (typeof result[0].t == 'string') {
+                    this.target.timeColumnType = result[0].t;
+                 }
+             }
+        }); 
+        this.panelCtrl.refresh(); 
+    }
+
+    addLiveWhereAction(part, index) {
+        this.liveWhereParts.push(sqlPart.create({type: 'expression', params: ['select field', '=', 'enter value']}));  
+        this.updatePersistedParts();
+        this.resetPlusButton(this.whereAdd);
+        this.panelCtrl.refresh();
+    }
+
+    LiveStreamSubscribeChanged() {
+        if (this.target.LiveStreamSubscribe) {
+            
+        } else {
+
+        }
+    }
+
+/////////////////////////////////////////// END OF MOST LIVE STREAM DEV CODE (SEE TYPE DEFINITIONS AT TOP) /////////////////////////////////
+
     newKdbArgSegment() {
         return this.uiSegmentSrv.newSegment({value: this.target.kdbSideFunction.toString(), fake: false})
     }
@@ -225,6 +332,12 @@ export class KDBQueryCtrl extends QueryCtrl {
             return _.map(parts, sqlPart.create).filter(n => n);
         });
         this.whereParts = _.map(this.target.where, sqlPart.create).filter(n => n);
+        /////////////////////////////////// LIVE STREAM DEV ///////////////////////////////
+        this.liveSelectParts = _.map(this.target.liveSelect, (parts: any) => {
+            return _.map(parts, sqlPart.create).filter(n => n);
+        });
+        this.liveWhereParts = _.map(this.target.liveWhere, sqlPart.create).filter(n => n);
+        /////////////////////////////////// LIVE STREAM DEV ///////////////////////////////
     }
 
     updatePersistedParts() {
@@ -236,6 +349,16 @@ export class KDBQueryCtrl extends QueryCtrl {
         this.target.where = _.map(this.whereParts, (part: any) => {
             return {type: part.def.type, datatype: part.datatype, name: part.name, params: part.params};
         });
+        /////////////////////////////////// LIVE STREAM DEV ///////////////////////////////
+        this.target.liveSelect = _.map(this.liveSelectParts, liveSelectParts => {
+            return _.map(liveSelectParts, (part: any) => {
+                return {type: part.def.type, datatype: part.datatype, params: part.params};
+            });
+        });
+        this.target.liveWhere = _.map(this.liveWhereParts, (part: any) => {
+            return {type: part.def.type, datatype: part.datatype, name: part.name, params: part.params};
+        });
+        ////////////////////////////////// LIVE STREAM DEV END ///////////////////////////////
     }
 
     buildSelectMenu() {
@@ -269,6 +392,9 @@ export class KDBQueryCtrl extends QueryCtrl {
         } else if(this.target.queryType == 'functionQuery'){
             this.buildFunctionQueryPanel();
             this.functionChanged();
+        } else if(this.target.queryType == 'liveStreamQuery'){
+            this.buildLiveStreamPanel();
+            this.target.queryError.error[3] = false;
         } else this.buildQueryBuilderPanel();
         this.panelCtrl.refresh()
     }
@@ -340,13 +466,13 @@ export class KDBQueryCtrl extends QueryCtrl {
             this.target.queryError.message[1] = 'Unhandled exception in conflation. Please post conflation settings on our GitHub page.'
         };
         if (this.target.useConflation === false) {
-            console.log(this.selectParts[0][1]);
+            //console.log(this.selectParts[0][1]);           /////////// LIVE STREAM DEV, DONT THIS THIS SHOULD BE EXPOSED ///////////
             this.selectParts.map(partGroup => {
                 for (let i=0;i<partGroup.length;i++) {
                     if(partGroup[i].part.type == "aggregate") partGroup.splice(i,1)
                 }
             })
-            console.log(this.selectParts[0][1]);
+            //console.log(this.selectParts[0][1]);           /////////// LIVE STREAM DEV, DONT THIS THIS SHOULD BE EXPOSED ///////////
         };
         this.updatePersistedParts();
         this.panelCtrl.refresh();
@@ -382,7 +508,7 @@ export class KDBQueryCtrl extends QueryCtrl {
     }
 
     groupingChanged() {
-        console.log(this.selectParts);
+        //console.log(this.selectParts);            /////////////// LIVE STREAM DEV, DONT THINK THIS SHOULD BE EXPOSED ///////////
         this.target.groupingField = this.groupingSegment.value;
         this.panelCtrl.refresh();
     }
@@ -478,7 +604,7 @@ export class KDBQueryCtrl extends QueryCtrl {
         return _.findIndex(selectParts, (p: any) => p.def.type === 'window' || p.def.type === 'moving_window');
     }
 
-    addSelectPart(selectParts, item, subItem) {
+    addSelectPart(selectParts, type, item, subItem) {
         let partType = item.value;
         if (subItem && subItem.type) {
             partType = subItem.type;
@@ -494,7 +620,8 @@ export class KDBQueryCtrl extends QueryCtrl {
                 const parts = _.map(selectParts, (part: any) => {
                     return sqlPart.create({type: part.def.type, params: _.clone(part.params)});
                 });
-                this.selectParts.push(parts);
+                //this.selectParts.push(parts)  ///////////// OLD PRE LIVE STREAM DEV CODE //////////////
+                type == 'select' ? this.selectParts.push(parts) : this.liveSelectParts.push(parts);    /////////// LIVE STREAM DEV /////////////
                 break;
             case 'percentile':
             case 'aggregate':
@@ -558,20 +685,26 @@ export class KDBQueryCtrl extends QueryCtrl {
         this.panelCtrl.refresh();
     }
 
-    removeSelectPart(selectParts, part, index) {
+    removeSelectPart(selectParts, type, part, index) {
         if (part.def.type === 'column') {
-            if (this.selectParts.length > 1) {
-                const modelsIndex = _.indexOf(this.selectParts, selectParts);
-                this.selectParts.splice(modelsIndex, 1);
+            if (type == 'select') {
+                if (this.selectParts.length > 1) {
+                    const modelsIndex = _.indexOf(this.selectParts, selectParts);
+                    this.selectParts.splice(modelsIndex, 1);
+                }
+            } else if (type == 'liveSelect') {
+                if (this.liveSelectParts.length > 1) {
+                    const modelsIndex = _.indexOf(this.liveSelectParts, selectParts);
+                    this.liveSelectParts.splice(modelsIndex, 1);
+                }
             }
         } else {
                 selectParts.splice(index, 1);
         }
-        
         this.updatePersistedParts();
     }
 
-    handleSelectPartEvent(part, index, evt, selectParts) {
+    handleSelectPartEvent(part, index, evt, selectParts, type) {
         switch (evt.name) {
             case 'get-param-options': {
                 return this.datasource
@@ -588,7 +721,7 @@ export class KDBQueryCtrl extends QueryCtrl {
                 break;
             }
             case 'action': {
-                this.removeSelectPart(selectParts, part, index);
+                this.removeSelectPart(selectParts, type, part, index);
                 this.panelCtrl.refresh();
                 break;
             }
