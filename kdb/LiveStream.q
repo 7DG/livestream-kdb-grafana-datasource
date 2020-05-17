@@ -12,8 +12,14 @@ subtable:([panelID:`guid$()]        //Each user has their own subtable, each pan
     );
 
 subs:(`int$()!());                  //Will be dict where key is websocket handle, value is that handles' subtable
-tabreqs:(`symbol$()!());            //Will be dict where key is table name, value is list of handles that want that table
+tabreqs:(`symbol$()!`int$());            //Will be dict where key is table name, value is list of handles that want that table
                                     //(E.g. if one user has 3 panels all wanting table `trade, tabreq[`trade] will only have that handle once.)
+
+subreq:{[dict]
+    
+    
+    
+    };
 
 updwrap:{[f;t;x]
     f[t;x];                         //Execute old upd
@@ -25,8 +31,7 @@ updwrap:{[f;t;x]
 
 upd:.grafLiveWS.updwrap[upd;;];
 
-subscriptionrequest:{[dict]
-    
-    
-    
+.z.wc:{[x]
+    delete x from `.grafLiveWS.subs;
+    .grafLiveWS.tabreqs:{[x;y] y except x}[x;]each .grafLiveWS.tabreqs;
     };
