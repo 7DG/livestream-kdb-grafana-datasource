@@ -66,7 +66,7 @@ export const graphFunction: string =  '{@[x;y;{`payload`error`success!(();"Error
 ' t:$[99h=type x; \n ' +
 ' key[x]!([]data:flip each value x); \n ' +
 ' ([id:1#`x]data:`#enlist x)]; \n ' +
-' :`payload`id`error`success!(t;gfid;$[(99h=type t)and(0<count x);\"OK\";\"NOT OK - Final table fault\"];1b); \n ' +
+' :`payload`datarequest`id`error`success!(t;`query;gfid;$[(99h=type t)and(0<count x);\"OK\";\"NOT OK - Final table fault\"];1b); \n ' +
 ' }]; \n ' +
 ' \n ' +
 ' end:0b; \n ' +
@@ -242,7 +242,7 @@ export const tabFunction: string = '{@[x;y;{`payload`error`success!(();"Error! -
 ' rows:enlist{value x}each t; \n ' +
 ' columns:enlist ([]text:key flip t); \n ' +
 ' r:`columns`rows!(columns;rows); \n ' +
-' :`payload`id`error`success!(r;gfid;$[0<count x;\"OK\";\"NOT OK - Final table fault\"];1b); \n ' +
+' :`payload`datarequest`id`error`success!(r;`query;gfid;$[0<count x;\"OK\";\"NOT OK - Final table fault\"];1b); \n ' +
 ' }]; \n ' +
 ' \n ' +
 ' end:0b; \n ' +
