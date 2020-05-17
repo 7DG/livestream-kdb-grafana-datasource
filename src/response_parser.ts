@@ -7,7 +7,7 @@ export default class ResponseParser {
     constructor(private $q) {
     }
 
-    processQueryResult(res, req) {
+    processQueryResult(res: any, req: any) {
         let data = {};
         if (!res) return data;
         //KDB+ Error Handling
@@ -34,6 +34,16 @@ export default class ResponseParser {
         }
         return data;
     }
+
+    //////////////////////////////// LIVE STREAM DEV CODE ////////////////////////////////
+    liveStreamDataReceived(res: any) {
+
+    }
+
+    subscriptionResponse(res: any) {
+        
+    }
+    //////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////
 
     mapTableData(res,req){
 
