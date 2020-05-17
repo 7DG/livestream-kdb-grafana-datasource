@@ -49,6 +49,7 @@ updwrap:{[f;t;data]
     f[t;data];                                                                  //Execute old upd
     wsUpdHandles:tabreqs[t];                                                    //Get list of all handles that want this table
     handleSubtabs:subs[wsUpd];                                                  //Get subtable for each of these handles
+    handleSubtabs:{[t;x] select from x where tablename=t}[t;]each handleSubtabs //Select from each handleSubtabs where the tablename matches the new data
     outputtablearrays:{[data;subTab]                                            //Serialised data to be sent back
         {[data;subTabRow]
             groupingBool:not subTabRow[`byclause] = `;
@@ -70,7 +71,7 @@ updwrap:{[f;t;data]
                     res;                                                        //Ungrouped payload (Arguments)
                     {"ERROR IN UNGROUPED TABLE HANDLING: ",x}                   //Ungrouped payload (Error handling)
                     ]
-            ];                                                              
+                ];                                                              
             
             id:subTabRow[`panelID];                                             //queryId
             error:if[10h=type payload;payload;"OK"]                             //Error object
