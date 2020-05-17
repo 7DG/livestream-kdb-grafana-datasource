@@ -11,4 +11,11 @@ export class QueryParam {
     conflation: any;
     query: QueryDictionary;
     maxRowCount: number;
+
+    ///////////////// LIVE STREAM DEV ///////////
+    liveTable: string;
+    liveColumn: any[] = [];
+    liveWhere: string[] = [];
+    liveTemporal_field: any;
+    ///////////////END OF LIVE STREAM DEV ////////
 }
