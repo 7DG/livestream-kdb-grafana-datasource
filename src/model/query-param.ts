@@ -10,6 +10,7 @@ export class QueryParam {
     grouping: string[] = [];
     conflation: any;
     query: QueryDictionary;
+    queryId: string;
     maxRowCount: number;
 
     ///////////////// LIVE STREAM DEV ///////////
