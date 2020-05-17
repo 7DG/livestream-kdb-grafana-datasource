@@ -9,9 +9,21 @@
          <select class="gf-form-input gf-size-auto" ng-model="ctrl.target.queryType" ng-options="qT.value as qT.text for qT in ctrl.queryTypes" ng-change="ctrl.onQueryChange()"></select>
       </div>
     </div>
-      <div class="gf-form gf-form--grow">
-        <div class="gf-form-label gf-form-label--grow"></div>
+    <div ng-if="ctrl.target.queryType == 'liveStreamQuery'" class= "gf-form-inline">
+      <div class="gf-form">
+        <label class="gf-form-label query-keyword width-14">
+          <span><input type="checkbox" class="width-2" ng-model="ctrl.target.LiveStreamSubscribe" ng-change="ctrl.LiveStreamSubscribeChanged()" value="LiveStreamSubscribe"></span>
+          <span>Snapshot + Stream
+            <info-popover mode="left-absolute">
+              Enable after query has been set to pull a snapshot of the query over the full data range and subscribe to data adhering to this criteria.
+            </info-popover>
+          </span>
+        </label>
       </div>
+    </div>
+    <div class="gf-form gf-form--grow">
+      <div class="gf-form-label gf-form-label--grow"></div>
+    </div>
   </div>
 
 
@@ -63,7 +75,7 @@
       </div>
 
       <div class="gf-form" ng-repeat="part in selectParts">
-        <sql-part-editor class="gf-form-label sql-part" part="part" handle-event="ctrl.handleSelectPartEvent(part, $index, $event, selectParts)">
+        <sql-part-editor class="gf-form-label sql-part" part="part" handle-event="ctrl.handleSelectPartEvent(part, $index, $event, selectParts, 'select')">
         </sql-part-editor>
         <!--
         <label class="gf-form-label width-7">
@@ -75,7 +87,7 @@
       <div class="gf-form">
         <label class="dropdown"
                 dropdown-typeahead="ctrl.selectMenu"
-                dropdown-typeahead-on-select="ctrl.addSelectPart(selectParts, $item, $subItem)">
+                dropdown-typeahead-on-select="ctrl.addSelectPart(selectParts, 'select', $item, $subItem)">
         </label>
       </div>
 
@@ -264,12 +276,125 @@
             </info-popover>
           </span>
       </div>
-
       <div class="gf-form gf-form--grow">
         <div class="gf-form-label gf-form-label--grow"></div>
       </div>
-      </div>
     </div>
+  </div>
+    <!-- End of div for KDB server-side function panel -->
+
+  <!-- Start of div for LiveStream Query panel-->
+  <div ng-if= "ctrl.target.queryType == 'liveStreamQuery' ">
+
+      <div class="gf-form-inline">
+        <div class="gf-form">
+  
+          <label class="gf-form-label query-keyword width-10">From</label>
+          <metric-segment segment="ctrl.liveTableSegment" get-options="ctrl.getTableSegments()" on-change="ctrl.onLiveTableChanged()"></metric-segment>
+  
+  <!--        <label class="gf-form-label query-keyword width-9">-->
+  <!--          Metric column-->
+  <!--          <info-popover mode="right-normal">Column to be used as metric name for the value column.</info-popover>-->
+  <!--        </label>-->
+  <!--        <metric-segment segment="ctrl.metricColumnSegment" get-options="ctrl.getMetricColumnSegments()" on-change="ctrl.metricColumnChanged()"></metric-segment>-->
+  <!--        <label class="gf-form-label query-keyword">-->
+  <!--            Limit-->
+  <!--          <info-popover mode="right-normal">The number of rows to return. Leave empty or set to 0 to return all rows.</info-popover>-->
+  <!--        </label>-->
+  <!--        <input type="number" class="gf-form-input width-4" ng-model="ctrl.target.limit" ng-change="ctrl.refresh()"></input>-->
+  
+        </div>
+        <div class="gf-form gf-form--grow">
+          <div class="gf-form-label gf-form-label--grow"></div>
+        </div>
+  
+      </div>
+      <div ng-if="ctrl.target.useTemporalField" class= "gf-form-inline">
+        <div class="gf-form">
+          <label class="gf-form-label query-keyword width-10">Time Column
+            <info-popover mode="left-absolute">
+              Time series data is plotted against this column.  Results are also automatically filtered on this field using the date extents of the graph.
+            </info-popover>
+          </label>
+          <metric-segment segment="ctrl.liveTimeColumnSegment" get-options="ctrl.getTimeColumnSegments()" on-change="ctrl.liveTimeColumnChanged()"></metric-segment>
+        </div>
+        <div class="gf-form gf-form--grow">
+          <div class="gf-form-label gf-form-label--grow"></div>
+        </div>
+      </div>
+  
+      <div class="gf-form-inline" ng-repeat="liveSelectParts in ctrl.liveSelectParts">
+        <div class="gf-form">
+          <label class="gf-form-label query-keyword width-10">
+            <span ng-show="$index === 0">Select</span>&nbsp;
+          </label>
+        </div>
+  
+        <div class="gf-form" ng-repeat="part in liveSelectParts">
+          <sql-part-editor class="gf-form-label sql-part" part="part" handle-event="ctrl.handleSelectPartEvent(part, $index, $event, liveSelectParts, 'liveSelect')">
+          </sql-part-editor>
+          <!--
+          <label class="gf-form-label width-7">
+            <span>Data Type: {{ctrl.colMeta}}</span>
+          </label>
+          -->
+        </div>
+  
+        <div class="gf-form">
+          <label class="dropdown"
+                  dropdown-typeahead="ctrl.selectMenu"
+                  dropdown-typeahead-on-select="ctrl.addSelectPart(liveSelectParts, 'liveSelect', $item, $subItem)">
+          </label>
+        </div>
+  
+        <div class="gf-form gf-form--grow">
+          <div class="gf-form-label gf-form-label--grow"></div>
+        </div>
+      </div>
+  
+      <!-- Where Clause -->
+      <div class="gf-form-inline" ng-if="ctrl.liveWhereParts.length == 0">
+        <div class="gf-form">
+          <label class="gf-form-label query-keyword width-10">Where
+            <info-popover mode="left-absolute">
+              'in' and 'within' operator arguments need to be provided as a comma seperated list (e.g. sym in AAPL,MSFT,IBM). 'within' requires lower bound first (e.g within 75,100; NOT within 100,75).
+            </info-popover>
+          </label>
+        </div>
+        <div class="gf-form">
+          <metric-segment segment="ctrl.whereAdd" get-options="ctrl.addLiveWhereAction(0, 0)"> </metric-segment>
+        </div>
+        <div class="gf-form gf-form--grow">
+          <div class="gf-form-label gf-form-label--grow"></div>
+        </div>
+      </div>
+      <div class="gf-form-inline" ng-repeat="part in ctrl.liveWhereParts" ng-if="ctrl.liveWhereParts.length !== 0">
+        <div class="gf-form">
+          <label class="gf-form-label query-keyword width-10">
+          <span ng-show="$index === 0">Where
+            <info-popover mode="left-absolute">
+              'in' and 'within' operator arguments need to be provided as a comma seperated list (e.g. sym in AAPL,MSFT,IBM). 'within' requires lower bound first (e.g within 75,100; NOT within 100,75).
+            </info-popover>
+          </span>&nbsp;
+          </label>
+        </div>
+  
+        <div class="gf-form">
+          <sql-part-editor class="gf-form-label sql-part" part="part" handle-event="ctrl.handleWherePartEvent(ctrl.liveWhereParts, part, $event, $index)">
+          </sql-part-editor>
+        </div>
+  
+        <div class="gf-form" ng-if="$index == ctrl.liveWhereParts.length - 1">
+          <metric-segment segment="ctrl.whereAdd" get-options="ctrl.addLiveWhereAction(part, $index)"></metric-segment>
+        </div>
+  
+        <div class="gf-form gf-form--grow">
+          <div class="gf-form-label gf-form-label--grow"></div>
+        </div>
+      </div>
+  
+    </div>
+    <!-- End of div for the LiveStream query-->
   
   <!-- Section for Conflation -->
   <div ng-if="ctrl.target.useTemporalField">
