@@ -5,11 +5,22 @@ import KDBQuery from './kdb_query';
 //import {KDBMetaQuery} from './meta_query';
 import { C } from './c';
 import { KdbRequest } from "./model/kdb-request";
+import { KdbSubscriptionRequest, KdbSubscription } from "./model/kdb-sub-request";
 import { QueryParam } from "./model/query-param";
 import { QueryDictionary } from "./model/queryDictionary";
 import { ConflationParams } from "./model/conflationParams";
 import { graphFunction } from './model/kdb-request-config';
 import { tabFunction,defaultTimeout,kdbEpoch } from './model/kdb-request-config';
+
+export class LiveStreamDatapoint {
+    target: string;
+    datapoints: number[][];
+};
+export class LiveStreamData {
+    refId: string;
+    data: LiveStreamDatapoint[];
+};
+
 export class KDBDatasource {
     //This is declaring the types of each member
     id: any;
@@ -26,6 +37,12 @@ export class KDBDatasource {
     maxRowCount: number;
     connectionStateCycles: number;
     timeoutLength: number;
+
+    /////////////////////////////// LIVE STREAM DEV CODE /////////////////////////
+    LiveStreamDataArray: LiveStreamData[];
+    //LiveStreamRefId: string[];
+
+    /////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////
 
     //WebSocket communication variables
     requestSentList: any[];
@@ -47,6 +64,8 @@ export class KDBDatasource {
         this.requestSentList = [];
         this.requestSentIDList = []
         this.responseReceivedList = [];
+
+        this.LiveStreamDataArray = [];
 
         this.url = 'http://' + instanceSettings.jsonData.host;
         if (instanceSettings.jsonData.useAuthentication) {
@@ -82,6 +101,7 @@ export class KDBDatasource {
     };
     //Websocket per request?
     private buildKdbRequest(target) {
+        if (target.queryType == 'liveStreamQuery') return ["", {subscribePanel: true}]        ///////////////////////////////// LIVE STREAM DEV CODE /////////////////////
         let queryParam = new QueryParam();
         let kdbRequest = new KdbRequest();
         let queryDictionary = new QueryDictionary();
@@ -92,6 +112,7 @@ export class KDBDatasource {
         queryDictionary.value = target.kdbFunction;
 
         queryParam.query = Object.assign({}, queryDictionary);
+        queryParam.queryId = target.queryId;
         queryParam.table = '`' + target.table;
         queryParam.column = this.buildColumnParams(target);
         queryParam.temporal_field = target.useTemporalField ? this.buildTemporalField(target) : [];
@@ -132,6 +153,55 @@ export class KDBDatasource {
             ((target.format == 'time series') ? graphFunction : tabFunction),
             Object.assign({}, kdbRequest)];
     }
+
+    ///////////////////////////////////////////// LIVE STREAM DEV CODE ////////////////////////////////////////////////
+    private buildKdbSubscriptionRequest(target) {
+        let kdbSubscriptionRequest = new KdbSubscriptionRequest();
+        let subscription = new KdbSubscription();
+        let queryDictionary = new QueryDictionary();
+        //let conflationParams = new ConflationParams();
+
+        //Need to take into account quotes in line, replace " with \"
+        queryDictionary.type = (target.queryType == 'selectQuery') ? '`select' : '`function';
+        queryDictionary.value = target.kdbFunction;
+
+        subscription.table = '`' + target.table;
+        subscription.select_cols = this.buildColumnParams(target);
+        subscription.temporal_col = target.useTemporalField ? this.buildTemporalField(target) : '';
+        //subscription.temporal_range = this.buildTemporalRange(target.range);
+        //subscription.maxRowCount = target.rowCountLimit
+        subscription.where_cols = this.buildWhereParams(target.where);
+        //conflation
+        /* if (target.useConflation) {
+            conflationParams.val = target.conflationDurationMS.toString();
+            conflationParams.agg = target.conflationDefaultAggType;
+            subscription.conflation = Object.assign({}, conflationParams);
+        }
+        else {
+            subscription.conflation = [];
+        } */
+
+        //add condition, has grouping been selected?
+        if (target.useGrouping && target.groupingField) {
+            subscription.grouping_col = ('`' + target.groupingField);
+        }
+
+        kdbSubscriptionRequest.time = this.getTimeStamp(new Date());
+        kdbSubscriptionRequest.refId = target.refId;
+        kdbSubscriptionRequest.format = target.format;
+        kdbSubscriptionRequest.panelId = target.queryId;
+        kdbSubscriptionRequest.version = target.version;
+
+        return [
+            ((target.format == 'time series') ? graphFunction : tabFunction),
+            Object.assign({}, kdbSubscriptionRequest)];
+    }
+
+    private buildSubscriptionData() {
+
+    }
+
+    ///////////////////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////////////////////
 
     //This function 
     private buildTemporalField(queryDetails) {
@@ -275,11 +345,17 @@ export class KDBDatasource {
     };
 
     query(options) {
+        console.log('QUERY OPTIONS: ', options)
         var prefilterResultCount = options.targets.length;
         var allRefIDs = [];
         var blankRefIDs = [];
         var validRequestList = [];
         var errorList = [];
+
+        ///////////////////////////////////////////// LIVE STREAM DEV CODE ////////////////////////////////////////////////
+
+
+        ///////////////////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////////////////////
 
         for(var i = 0; i < prefilterResultCount; i++){
             allRefIDs.push(options.targets[i].refId);
@@ -362,26 +438,26 @@ export class KDBDatasource {
 
     private ProcessData(curRequest, nrRequests, resultList, requestList) {
         return new Promise(resolve => {
-                this.getQueryResult(requestList[curRequest]).then((result) => {
-                    var indicies = Object.keys(result);
-                    if (result.hasOwnProperty('meta.errorReceived')) {
-                        resultList.push(result);
+            this.getQueryResult(requestList[curRequest]).then((result) => {
+                var indicies = Object.keys(result);
+                if (result.hasOwnProperty('meta.errorReceived')) {
+                    resultList.push(result);
+                }
+                else {
+                    for (let i = 0; i < indicies.length; i++) {
+                        resultList.push(result[i]);
                     }
-                    else {
-                        for (let i = 0; i < indicies.length; i++) {
-                            resultList.push(result[i]);
-                        }
-                    }
+                }
 
-                    if (curRequest == (nrRequests - 1)) {
-                        let returnVal = resultList;
-                        resolve(returnVal);
-                    }
-                    else {
-                        curRequest++;
-                        resolve(this.ProcessData(curRequest, nrRequests, resultList, requestList));
-                    }
-                })
+                if (curRequest == (nrRequests - 1)) {
+                    let returnVal = resultList;
+                    resolve(returnVal);
+                }
+                else {
+                    curRequest++;
+                    resolve(this.ProcessData(curRequest, nrRequests, resultList, requestList));
+                }
+            })
         })
     }
 
@@ -390,11 +466,19 @@ export class KDBDatasource {
         let curRequest = request;
         let timeoutError = "Query sent at " + new Date() + " timed out.";
         let malformedResError = "Malformed response. Check KDB+ WebSocket handler is correctly configured."
+        console.log('REQUEST: ', request);                                              //////////////////////////// LIVE STREAM DEV INSPECTION ////////////////////////////
+        if (request[1].subscribePanel) {
+            
+        };
         let response = new Promise(resolve => {
             this.executeAsyncQuery(curRequest).then((result) => {
-                if (Object.keys(result).indexOf("payload") === -1) {return resolve([this.showEmpty(curRequest[1].refId, malformedResError)])} else
-                {const processedResult = this.responseParser.processQueryResult(result, curRequest);
-                return resolve(processedResult);}
+                if (Object.keys(result).indexOf("payload") === -1) {
+                    return resolve([this.showEmpty(curRequest[1].refId, malformedResError)])
+                } else {
+                    const processedResult = this.responseParser.processQueryResult(result, curRequest);
+                    console.log(result);                                                //////////////////////////// LIVE STREAM DEV INSPECTION ////////////////////////////
+                    return resolve(processedResult);
+                }
             });
         });
         let timeout = new Promise(resolve => {
@@ -457,6 +541,14 @@ export class KDBDatasource {
         let deserializedResult = _c.deserialize(responseObj.data);
         if (!deserializedResult.ID) {
             return console.log('received malformed data')
+        //////////////////////////////// LIVE STREAM DEV CODE ////////////////////////////////
+/*         } else if (deserializedResult.o.datarequest) {
+            if (deserializedResult.o.datarequest == 'subscription') {
+                return this.responseParser.liveStreamDataReceived(deserializedResult);
+            } else if (deserializedResult.o.datarequest == 'subscriptionRequest') {
+                return this.responseParser.subscriptionResponse(deserializedResult);
+            } */
+        //////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////    
         } else if (this.requestSentIDList.indexOf(deserializedResult.ID) === -1) {
             return console.log('received unrequested data');
         } else {
