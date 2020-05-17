@@ -67,6 +67,12 @@ export default class KDBQuery {
         //how does this work.  Should we add it?
         target.limit = target.limit || 0;
 
+        //////////////////////////////////// LIVE STREAM DEV ///////////////////////////////
+        target.liveSelect = target.liveSelect || [[{type: 'column', params: ['value']}]];
+        target.liveWhere = target.liveWhere || [];
+        //target.liveTable = target.liveTable || 'Select Table'
+        //////////////////////////////// END OF LIVE STREAM DEV ////////////////////////////
+
                //Error handling object
         target.queryError = {
             //Errors present: From(table), conflation, Row Count, funcGroupCol
