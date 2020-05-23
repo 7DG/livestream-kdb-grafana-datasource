@@ -3,12 +3,13 @@
 \d .grafLiveWS
 
 subtable:([panelID:`long$()]        //Each user has their own subtable, each panel is one entry.
-    tablename:`sym$();
+    refId:`sym$();                  //refId of query in panel
+    tablename:`sym$();              //name of table selecting from
     //temporalbool:`boolean$();
-    temporal_col:`sym$();
+    temporal_col:`sym$();           //name of temporal column
     //temporalfrom:`timestamp$();
     //temporalto:`timestamp$();
-    whereclause:();
+    whereclause:();                 //where clause 
     byclause:();
     selectclause:()
     );
@@ -19,15 +20,20 @@ subs:(`symbol$()!());               //Will be dict where key is SYMBOL of WS han
 tabreqs:(`symbol$()!());            //Will be dict where key is table name, value is list of handles that want that table
                                     //(E.g. if one user has 3 panels all wanting table `trade, tabreq[`trade] will only have that handle once.)
 
+selectReader:{[x] :(value first x;last x)};
+
 subreq:{[dict]
+    reqid:"J"$raze string .Q.an ? dict[`subscription;`panelId];
+    refId:dict[`refId]
     subentry:(
-        "J"$raze string .Q.an ? dict[`subscription;`panelId];
+        reqid;
+        refId;
         dict[`subscription;`table];
         //dict[`subscription;`willBeTemporalBoolEventually];
         dict[`subscription;`temporal_col];
         value each dict[`subscription;`where_cols];
         $[`grouping_col in key dict[`subscription];dict[`subscription;`grouping_col];`];
-        dict[`subscription;`select_cols]!dict[`subscription;`select_cols]
+        selectReader each dict[`subscription;`select_cols]
     );
     if[not (`$string[.z.w]) in key .grafLiveWS.subs;                            //if[first sub from this handle; create a subtable and add to .grafLiveWS.subs]
         .grafLiveWS.subs[`$string .z.w]:.grafLiveWS.subtable];
@@ -43,6 +49,12 @@ subreq:{[dict]
     success:$[10h=type subtabinsert;0b;1b];
     error:$[not success;subtabinsert;"OK"];
     datarequest:`subscriptionRequest;
+    :(!) . flip (                                                       //Return dictionary
+                (`error;error);
+                (`refId;refId);
+                (`id;reqid);
+                (`success;success);
+                (`datarequest;datarequest)
     };
 
 updwrap:{[f;t;data]
@@ -63,17 +75,18 @@ updwrap:{[f;t;data]
 
             $[groupingBool;                                                     //Grouping check
                 payload:(                                                       //Grouped payload
-                    (flip (enlist subTabRow[`byclause])!enlist key flip each res);
-                    value flip each res
+                    (key flip each res);
+                    {enlist[`data]!enlist x}each value flip each res
                     );
                 payload:@[                                                      //Ungrouped payload
-                    {[res] (enlist enlist[`id]!enlist`x;res)};                  //Ungrouped payload (Function)
+                    {[res] (enlist enlist[`id]!enlist`x;enlist (enlist[`data]!enlist res))}; //Ungrouped payload (Function)
                     res;                                                        //Ungrouped payload (Arguments)
                     {"ERROR IN UNGROUPED TABLE HANDLING: ",x}                   //Ungrouped payload (Error handling)
                     ]
                 ];                                                              
             
             id:subTabRow[`panelID];                                             //queryId
+            refId:subTabRow[`refId];                                            //refId
             error:if[10h=type payload;payload;"OK"]                             //Error object
             success:$[groupingBool;
                 $[all 98h=type each payload[1];1b;0b];
@@ -82,6 +95,7 @@ updwrap:{[f;t;data]
             datarequest:`subscription;
             :(!) . flip (                                                       //Return dictionary
                 (`error;error);
+                (`refId;refId);
                 (`id;id);
                 (`success;success);
                 (`payload;payload);
