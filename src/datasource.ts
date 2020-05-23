@@ -11,15 +11,17 @@ import { QueryDictionary } from "./model/queryDictionary";
 import { ConflationParams } from "./model/conflationParams";
 import { graphFunction } from './model/kdb-request-config';
 import { tabFunction,defaultTimeout,kdbEpoch } from './model/kdb-request-config';
+import { KDBBuilder } from './query_build';
 
-export class LiveStreamDatapoint {
-    target: string;
-    datapoints: number[][];
+/* interface LiveStreamDataID {
+    [id: string]: string
 };
-export class LiveStreamData {
-    refId: string;
-    data: LiveStreamDatapoint[];
-};
+interface LiveStreamDataData {
+    data: any[]
+}
+export class LiveStreamDataDictionary {
+    [id: string]: Array<LiveStreamDataID[] | LiveStreamDataData[]>
+} */
 
 export class KDBDatasource {
     //This is declaring the types of each member
@@ -27,6 +29,7 @@ export class KDBDatasource {
     name: any;
     responseParser: ResponseParser;
     queryModel: KDBQuery;
+    queryBuilder: KDBBuilder;
     interval: string;
     message = {};
     url: string;
@@ -39,8 +42,8 @@ export class KDBDatasource {
     timeoutLength: number;
 
     /////////////////////////////// LIVE STREAM DEV CODE /////////////////////////
-    LiveStreamDataArray: LiveStreamData[];
-    //LiveStreamRefId: string[];
+    LiveStreamDataDictionary: any;
+    LiveStreamReqDictionary: any;
 
     /////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////
 
@@ -55,6 +58,7 @@ export class KDBDatasource {
         this.id = instanceSettings.id;
         this.responseParser = new ResponseParser(this.$q);
         this.queryModel = new KDBQuery({});
+        this.queryBuilder = new KDBBuilder();
         this.interval = (instanceSettings.jsonData || {}).timeInterval;
         if (!instanceSettings.jsonData.timeoutLength) {
             this.timeoutLength = defaultTimeout
@@ -65,7 +69,8 @@ export class KDBDatasource {
         this.requestSentIDList = []
         this.responseReceivedList = [];
 
-        this.LiveStreamDataArray = [];
+        this.LiveStreamDataDictionary = {};
+        this.LiveStreamReqDictionary = {};
 
         this.url = 'http://' + instanceSettings.jsonData.host;
         if (instanceSettings.jsonData.useAuthentication) {
@@ -81,7 +86,7 @@ export class KDBDatasource {
 
     }
 
-    interpolateVariable = (value, variable) => {
+    /* interpolateVariable = (value, variable) => {
         if (typeof value === 'string') {
             if (variable.multi || variable.includeAll) {
                 return this.queryModel.quoteLiteral(value);
@@ -98,228 +103,7 @@ export class KDBDatasource {
             return this.queryModel.quoteLiteral(v);
         });
         return quotedValues.join(',');
-    };
-    //Websocket per request?
-    private buildKdbRequest(target) {
-        if (target.queryType == 'liveStreamQuery') return ["", {subscribePanel: true}]        ///////////////////////////////// LIVE STREAM DEV CODE /////////////////////
-        let queryParam = new QueryParam();
-        let kdbRequest = new KdbRequest();
-        let queryDictionary = new QueryDictionary();
-        let conflationParams = new ConflationParams();
-
-        //Need to take into account quotes in line, replace " with \"
-        queryDictionary.type = (target.queryType == 'selectQuery') ? '`select' : '`function';
-        queryDictionary.value = target.kdbFunction;
-
-        queryParam.query = Object.assign({}, queryDictionary);
-        queryParam.queryId = target.queryId;
-        queryParam.table = '`' + target.table;
-        queryParam.column = this.buildColumnParams(target);
-        queryParam.temporal_field = target.useTemporalField ? this.buildTemporalField(target) : [];
-        queryParam.temporal_range = this.buildTemporalRange(target.range);
-        queryParam.maxRowCount = target.rowCountLimit
-        if (target.queryType == 'selectQuery') queryParam.where = this.buildWhereParams(target.where);
-        //conflation
-        if (target.useConflation) {
-            conflationParams.val = target.conflationDurationMS.toString();
-            conflationParams.agg = target.conflationDefaultAggType;
-            queryParam.conflation = Object.assign({}, conflationParams);
-        }
-        else {
-            queryParam.conflation = [];
-        }
-
-        //add condition, has grouping been selected?
-        if (target.useGrouping && target.queryType == 'selectQuery' && target.groupingField) {
-            queryParam.grouping = [('`' + target.groupingField)];
-        }
-        else  if (target.useGrouping && target.queryType == 'functionQuery' && target.funcGroupCol) {
-            queryParam.grouping = [('`' + target.funcGroupCol)];
-            
-        }
-        else {
-            queryParam.grouping = [];
-        }
-
-        kdbRequest.time = this.getTimeStamp(new Date());
-        kdbRequest.refId = target.refId;
-        kdbRequest.query = ''//query;
-        kdbRequest.queryParam = Object.assign({}, queryParam);
-        kdbRequest.format = target.format;
-        kdbRequest.queryId = target.queryId;
-        kdbRequest.version = target.version;
-
-        return [
-            ((target.format == 'time series') ? graphFunction : tabFunction),
-            Object.assign({}, kdbRequest)];
-    }
-
-    ///////////////////////////////////////////// LIVE STREAM DEV CODE ////////////////////////////////////////////////
-    private buildKdbSubscriptionRequest(target) {
-        let kdbSubscriptionRequest = new KdbSubscriptionRequest();
-        let subscription = new KdbSubscription();
-        let queryDictionary = new QueryDictionary();
-        //let conflationParams = new ConflationParams();
-
-        //Need to take into account quotes in line, replace " with \"
-        queryDictionary.type = (target.queryType == 'selectQuery') ? '`select' : '`function';
-        queryDictionary.value = target.kdbFunction;
-
-        subscription.table = '`' + target.table;
-        subscription.select_cols = this.buildColumnParams(target);
-        subscription.temporal_col = target.useTemporalField ? this.buildTemporalField(target) : '';
-        //subscription.temporal_range = this.buildTemporalRange(target.range);
-        //subscription.maxRowCount = target.rowCountLimit
-        subscription.where_cols = this.buildWhereParams(target.where);
-        //conflation
-        /* if (target.useConflation) {
-            conflationParams.val = target.conflationDurationMS.toString();
-            conflationParams.agg = target.conflationDefaultAggType;
-            subscription.conflation = Object.assign({}, conflationParams);
-        }
-        else {
-            subscription.conflation = [];
-        } */
-
-        //add condition, has grouping been selected?
-        if (target.useGrouping && target.groupingField) {
-            subscription.grouping_col = ('`' + target.groupingField);
-        }
-
-        kdbSubscriptionRequest.time = this.getTimeStamp(new Date());
-        kdbSubscriptionRequest.refId = target.refId;
-        kdbSubscriptionRequest.format = target.format;
-        kdbSubscriptionRequest.panelId = target.queryId;
-        kdbSubscriptionRequest.version = target.version;
-
-        return [
-            ((target.format == 'time series') ? graphFunction : tabFunction),
-            Object.assign({}, kdbSubscriptionRequest)];
-    }
-
-    private buildSubscriptionData() {
-
-    }
-
-    ///////////////////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////////////////////
-
-    //This function 
-    private buildTemporalField(queryDetails) {
-        if(queryDetails.queryType == 'selectQuery' && queryDetails.timeColumn) {
-            return ('`' + queryDetails.timeColumn)
-        }
-        else if (queryDetails.queryType == 'functionQuery' && queryDetails.funcTimeCol) {
-            return ('`' + queryDetails.funcTimeCol);
-        }
-        else {
-            return '';
-        };
-    };
-
-    private buildKdbTimestamp(date : Date) {
-        return 1000000 * (date.valueOf() - kdbEpoch);
-    }
-
-    private buildTemporalRange(range) {
-        let temporalRange: number[] = [];
-        if (range) {
-            temporalRange.push(this.buildKdbTimestamp(range.from._d));
-            temporalRange.push(this.buildKdbTimestamp(range.to._d));
-        }
-        return temporalRange;
-    };
-
-    private buildWhereParams(queryWhereList): Array<string> {
-        let whereArray = [];
-        let whereClause = [];
-
-        if (queryWhereList.length > 0) {
-            queryWhereList.forEach(clause => {
-                let notStatement = false
-                if(clause.params[0] !== 'select field' && clause.params[2] !== 'enter value') {
-                    whereClause = [];
-                    if(clause.params[1].substr(0,3) == "not") {
-                        clause.params[1] = clause.params[1].substr(4)
-                        whereClause.push(clause.params[1]);
-                        notStatement = true
-                    } else whereClause.push(clause.params[1]);
-                    whereClause.push('`' + clause.params[0]);
-                    if (clause.datatype == 's') {
-                        if (clause.params[1] == "in") {
-                            whereClause.push(clause.params[2].split(",").map(str => "`"+str.trim()))
-                        } else if (clause.params[1] == "like") {
-                            whereClause.push('\"' + clause.params[2] + '\"');
-                        } else
-                        whereClause.push('`' + clause.params[2]);
-                    }
-                    else if (clause.datatype == 'c') {
-                        whereClause.push('\"' + clause.params[2] + '\"');
-                    }
-                    else {
-                        if (clause.params[1] == "within") {
-                            whereClause.push(clause.params[2].split(",").map(str => str.trim()))
-                        } else whereClause.push(clause.params[2]);
-                    }
-                    if (notStatement === true) {
-                        whereClause.push("x")
-                    } else whereClause.push("o") 
-                    whereArray.push(whereClause);
-                }
-            })
-        }
-
-        return whereArray;
-    }//end of building of where clause
-
-    //Builds the list of select functions consisting of the column name and an aggregation function where applicable
-    private buildColumnParams(target): Array<string> {
-        let columnArray: any[] = [];
-        target.select.forEach(select => {
-            if (select[0].params[0] !== 'select column') {
-                let selectElement = [];
-                if (target.useConflation) {
-                    if (select.length !== 1) {
-                        if (select[1].type == 'aggregate') {
-                            selectElement.push(select[1].params[0]);
-                        }
-                        else {
-                            selectElement.push(target.conflationDefaultAggType);
-                        }
-                    }
-                    else {
-                        selectElement.push(target.conflationDefaultAggType);
-                    }
-                }
-                else {
-                    selectElement.push('::'); //dummy value for kdb function
-                }
-                selectElement.push('`' + select[0].params[0]);
-
-                //dealing with aliasing
-                let alias = '::';
-                if (select.length > 1) {
-                    if (select[1].type == 'alias') {
-                        alias = select[1].params[0];
-                    }
-                }
-                if (select.length == 3) {
-                    if (select[2].type == 'alias') {
-                        alias = select[2].params[0];
-                    }
-                }
-
-                selectElement.push(alias);
-                columnArray.push(selectElement);
-            }
-
-        });
-        return columnArray;
-    }
-
-    private getTimeStamp(date: Date): string {
-        let dateString = date.valueOf().toString();
-        return dateString.substring(0, dateString.length - 3);
-    }
+    }; */
 
     showEmpty(Id: string, errormessage?: string) {
     
@@ -376,7 +160,7 @@ export class KDBDatasource {
 
         var nrBlankRequests = blankRefIDs.length
         var requestList = validRequestList.map(target => {
-            return this.buildKdbRequest(target);
+            return this.queryBuilder.buildKdbRequest(target);
             });
 
         var nrRequests: number = requestList.length;
@@ -393,6 +177,33 @@ export class KDBDatasource {
         }
     };
 
+    subscriptionQuery() {
+        let dataArr = []
+        let LiveKeys = Object.keys(this.LiveStreamDataDictionary);
+        for (let i = 0; i < LiveKeys.length;i++) {
+            for (let d = 0; d < this.LiveStreamDataDictionary[LiveKeys[i]][0].length;d++) {
+                let keycol = this.LiveStreamDataDictionary[LiveKeys[i]][0][d];
+                let datalist = this.LiveStreamDataDictionary[LiveKeys[i]][1][d];
+                let req = this.LiveStreamReqDictionary[LiveKeys[i]][d];
+                dataArr.push(this.responseParser.mapSubscriptionData(keycol, datalist, req))
+            }
+        }
+    }
+
+    subscriptionQueryRefId(requestRefId: string) {
+        let dataArr = []
+        if(Object.keys(this.LiveStreamDataDictionary).indexOf(requestRefId) == -1) {
+            return [this.showEmpty(requestRefId, "No data could be found in cache for this query.")];
+        };
+        for (let d = 0; d < this.LiveStreamDataDictionary[requestRefId][0].length;d++) {
+            let keycol = this.LiveStreamDataDictionary[requestRefId][0][d];
+            let datalist = this.LiveStreamDataDictionary[requestRefId][1][d];
+            let req = this.LiveStreamReqDictionary[requestRefId][d];
+            dataArr.push(this.responseParser.mapSubscriptionData(keycol, datalist, req))
+        }
+        return dataArr
+    }
+
     sendQueries(nrRequests,requestList,nrBlankRequests,blankRefIDs,errorList) {
         var curRequest: number = 0;
         var resultList = [];
@@ -407,6 +218,7 @@ export class KDBDatasource {
                     for(var i = 0; i < errorList.length; i++){
                         resultList.push(this.showEmpty(errorList[i].refId, errorList[i].errorMessage))
                     };
+                    console.log({data: resultList});
                     resolve({data: resultList});
 
                 }).catch(e => {
@@ -463,7 +275,6 @@ export class KDBDatasource {
 
     //Response parser called here**********************
     private getQueryResult = (request: any): Promise<Object> => {
-        let curRequest = request;
         let timeoutError = "Query sent at " + new Date() + " timed out.";
         let malformedResError = "Malformed response. Check KDB+ WebSocket handler is correctly configured."
         console.log('REQUEST: ', request);                                              //////////////////////////// LIVE STREAM DEV INSPECTION ////////////////////////////
@@ -471,23 +282,54 @@ export class KDBDatasource {
             
         };
         let response = new Promise(resolve => {
-            this.executeAsyncQuery(curRequest).then((result) => {
-                if (Object.keys(result).indexOf("payload") === -1) {
-                    return resolve([this.showEmpty(curRequest[1].refId, malformedResError)])
-                } else {
-                    const processedResult = this.responseParser.processQueryResult(result, curRequest);
-                    console.log(result);                                                //////////////////////////// LIVE STREAM DEV INSPECTION ////////////////////////////
-                    return resolve(processedResult);
-                }
-            });
+            if(request[1].subscribePanel) {
+                resolve(this.subscriptionQueryRefId(request[1].refId))
+            } else {
+                this.executeAsyncQuery(request).then((result) => {
+                    if (Object.keys(result).indexOf("payload") === -1) {
+                        return resolve([this.showEmpty(request[1].refId, malformedResError)])
+                    } else {
+                        const processedResult = this.responseParser.processQueryResult(result, request);
+                        console.log(result);                                                //////////////////////////// LIVE STREAM DEV INSPECTION ////////////////////////////
+                        return resolve(processedResult);
+                    }
+                });
+            }
         });
         let timeout = new Promise(resolve => {
             let wait =  setTimeout(() => {
                 clearTimeout(wait);
-                resolve([this.showEmpty(curRequest[1].refId, timeoutError)]);
+                resolve([this.showEmpty(request[1].refId, timeoutError)]);
             }, this.timeoutLength)
         });
         return Promise.race([timeout, response])
+    }
+
+    sendSubscriptionRequest(target) {
+        console.log('SEND SUB REQUEST LOCAL TARGET:', target)
+        //Code for creating a new subscription
+        let subReq = this.queryBuilder.buildKdbSubscriptionRequest(target);
+        this.executeAsyncQuery(subReq).then(res => {
+            this.responseParser.subscriptionResponse(res);
+        })
+    };
+    
+    cancelSubscription(target) {
+        //Code for cancelling a single subscription
+    }
+
+    liveStreamDataReceived(res: any) {
+        let IDarr = res.payload[0];
+        let DATAarr = res.payload[1];
+        for(let idx = 0; idx < IDarr; idx++) {
+            let res_ind = this.LiveStreamDataDictionary[res.refId][0].indexOf(IDarr[idx]);
+            if (res_ind == -1) {
+                this.LiveStreamDataDictionary[res.refId][0].push(IDarr[idx]);
+                this.LiveStreamDataDictionary[res.refId][1].push(DATAarr[idx])
+            } else {
+                this.LiveStreamDataDictionary[res.refId][1][res_ind].data.push(DATAarr[res_ind].data)
+            }
+        }
     }
 
     connectWS() {
@@ -542,12 +384,13 @@ export class KDBDatasource {
         if (!deserializedResult.ID) {
             return console.log('received malformed data')
         //////////////////////////////// LIVE STREAM DEV CODE ////////////////////////////////
-/*         } else if (deserializedResult.o.datarequest) {
+        } else if (deserializedResult.o.datarequest) {
             if (deserializedResult.o.datarequest == 'subscription') {
-                return this.responseParser.liveStreamDataReceived(deserializedResult);
+                return this.liveStreamDataReceived(deserializedResult.o);
             } else if (deserializedResult.o.datarequest == 'subscriptionRequest') {
-                return this.responseParser.subscriptionResponse(deserializedResult);
-            } */
+                var requestNum = this.requestSentIDList.indexOf(deserializedResult.ID);
+                this.requestSentList[requestNum].resolve(deserializedResult.o)
+            } 
         //////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////    
         } else if (this.requestSentIDList.indexOf(deserializedResult.ID) === -1) {
             return console.log('received unrequested data');
