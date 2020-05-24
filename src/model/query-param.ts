@@ -8,6 +8,7 @@ export class QueryParam {
     temporal_field: any;
     temporal_range: number[] = [];
     grouping: string[] = [];
+    select_cols: any;                  ///////////////////// LIVE STREAM DEV, TO BE REMOVED //////////////////
     conflation: any;
     query: QueryDictionary;
     queryId: string;

@@ -12,10 +12,18 @@
     <div ng-if="ctrl.target.queryType == 'liveStreamQuery'" class= "gf-form-inline">
       <div class="gf-form">
         <label class="gf-form-label query-keyword width-14">
-          <span><input type="checkbox" class="width-2" ng-model="ctrl.target.LiveStreamSubscribe" ng-change="ctrl.liveStreamSubscribeChanged()" value="LiveStreamSubscribe"></span>
+          <span><input type="checkbox" class="width-1" ng-model="ctrl.target.LiveStreamSubscribe" ng-change="ctrl.liveStreamSubscribeChanged()" value="LiveStreamSubscribe"></span>
           <span>Snapshot + Stream
             <info-popover mode="left-absolute">
               Enable after query has been set to pull a snapshot of the query over the full data range and subscribe to data adhering to this criteria.
+            </info-popover>
+          </span>
+        </label>
+        <label class="gf-form-label query-keyword width-14">
+          <span><input type="checkbox" class="width-1" ng-model="ctrl.target.LiveStreamSubscribeOnly" ng-change="ctrl.subOnlyToggled(ctrl.target)" value="LiveStreamSubscribeOnly"></span>
+          <span>Subscribe Only
+            <info-popover mode="left-absolute">
+              Enable after query has been set to only subscribe to data adhering to this criteria (DEV).
             </info-popover>
           </span>
         </label>
