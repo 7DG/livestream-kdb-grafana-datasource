@@ -100,11 +100,14 @@ updwrap:{[f;t;data]
             res:.[{[data;subTabRow;grp;slctT] ?[                                          //Error trap wrapped functional select
                 data;                                                           // FROM
                 subTabRow[`whereclause];                                        // WHERE
-                $[grp;subTabRow[`byclause];0b];                                 // BY 
+                $[grp;                                                          // BY
+                    enlist[subTabRow[`byclause]]!enlist[subTabRow[`byclause]];  // BY
+                    0b];                                                        // BY
                 slctT,subTabRow[`selectclause]]                                 // SELECT
             };(data;subTabRow;groupingBool;selectTime);{x}];                                           //input + error trap
             if[10h=type res;:-8!"ERROR IN QUERY: ",res];                        //If func select failed, return string with error
-
+            .dg.selectdetails:(data;subTabRow;groupingBool;selectTime);
+            .dg.lastres:res;
             $[groupingBool;                                                     //Grouping check
                 payload:(                                                       //Grouped payload
                     (key flip each res);

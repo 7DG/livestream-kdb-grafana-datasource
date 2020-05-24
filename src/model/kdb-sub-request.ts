@@ -22,7 +22,7 @@ export class KdbSubscription {
 }
 
 export class LiveStreamReqDictionary {
-    [id:string]: Array<KdbSubscriptionRequest>
+    [id:string]: KdbSubscriptionRequest
 }
 
 export const liveSubscriptionRequest: string =  ' {[dict] \n ' +

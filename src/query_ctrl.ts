@@ -7,7 +7,6 @@ import {SqlPart} from './sql_part/sql_part';
 import KDBQuery from './kdb_query';
 import sqlPart from './sql_part';
 import { defaultRowCountLimit } from './model/kdb-request-config';
-import { KDBDatasource } from './datasource'
 import { KDBBuilder } from './query_build';
 //Declaring default constants
 const conflationUnitDefault: string = 'm';

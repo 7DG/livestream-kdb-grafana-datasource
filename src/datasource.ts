@@ -5,13 +5,10 @@ import KDBQuery from './kdb_query';
 //import {KDBMetaQuery} from './meta_query';
 import { C } from './c';
 import { KdbRequest } from "./model/kdb-request";
-import { KdbSubscriptionRequest, KdbSubscription,LiveStreamReqDictionary } from "./model/kdb-sub-request";
-import { QueryParam } from "./model/query-param";
-import { QueryDictionary } from "./model/queryDictionary";
-import { ConflationParams } from "./model/conflationParams";
-import { graphFunction } from './model/kdb-request-config';
-import { tabFunction,defaultTimeout,kdbEpoch } from './model/kdb-request-config';
+import { KdbSubscription,LiveStreamReqDictionary } from "./model/kdb-sub-request";
+import { defaultTimeout,kdbEpoch } from './model/kdb-request-config';
 import { KDBBuilder } from './query_build';
+import { QueryCtrl } from './module'
 
 /* interface LiveStreamDataID {
     [id: string]: string
@@ -40,6 +37,7 @@ export class KDBDatasource {
     maxRowCount: number;
     connectionStateCycles: number;
     timeoutLength: number;
+    panelRefresh: any;
 
     /////////////////////////////// LIVE STREAM DEV CODE /////////////////////////
     LiveStreamDataDictionary: any;
@@ -57,8 +55,11 @@ export class KDBDatasource {
         this.name = instanceSettings.name;
         this.id = instanceSettings.id;
         this.responseParser = new ResponseParser(this.$q);
+        console.log('$q', $q)
+        console.log('templateSrv', templateSrv)
         this.queryModel = new KDBQuery({});
         this.queryBuilder = new KDBBuilder();
+        this.panelRefresh = new QueryCtrl.panelCtrl.refresh()
         this.interval = (instanceSettings.jsonData || {}).timeInterval;
         if (!instanceSettings.jsonData.timeoutLength) {
             this.timeoutLength = defaultTimeout
@@ -177,7 +178,7 @@ export class KDBDatasource {
         }
     };
 
-    subscriptionQuery() {
+    /* subscriptionQuery() {
         let dataArr = []
         let LiveKeys = Object.keys(this.LiveStreamDataDictionary);
         for (let i = 0; i < LiveKeys.length;i++) {
@@ -188,7 +189,7 @@ export class KDBDatasource {
                 dataArr.push(this.responseParser.mapSubscriptionData(keycol, datalist, req))
             }
         }
-    }
+    } */
 
     subscriptionQueryRefId(requestRefId: string) {
         let dataArr = []
@@ -198,7 +199,7 @@ export class KDBDatasource {
         for (let d = 0; d < this.LiveStreamDataDictionary[requestRefId][0].length;d++) {
             let keycol = this.LiveStreamDataDictionary[requestRefId][0][d];
             let datalist = this.LiveStreamDataDictionary[requestRefId][1][d];
-            let req = this.LiveStreamReqDictionary[requestRefId][d];
+            let req = this.LiveStreamReqDictionary[requestRefId];
             dataArr.push(...this.responseParser.mapSubscriptionData(keycol, datalist, req))
         }
         return dataArr
@@ -313,8 +314,7 @@ export class KDBDatasource {
         this.executeAsyncQuery(subReq).then(res => {
             let success = this.responseParser.subscriptionResponse(res);
             if(success) {
-                this.LiveStreamReqDictionary[target.refId] = [];
-                this.LiveStreamReqDictionary[target.refId].push(target);
+                this.LiveStreamReqDictionary[target.refId] = target;
             }
         });
     };
@@ -345,11 +345,12 @@ export class KDBDatasource {
                     let v = this.LiveStreamDataDictionary[res.refId][0][i][k];
                     let nk = Object.keys(IDarr[idx])[0];
                     let nv = IDarr[idx][nk];
-                    if(k === nk && v === nv) {
-                        var res_ind = i
-                        i = this.LiveStreamDataDictionary[res.refId][0].length
-                    }
-                }
+                    if((k === nk) && (v === nv)) {
+                        var res_ind = i;
+                        i = this.LiveStreamDataDictionary[res.refId][0].length;
+                    };
+                };
+                if ('undefined' === typeof res_ind) var res_ind = -1;
             };
             console.log('RES_IND', res_ind)
             console.log("res.refId", res.refId)
@@ -357,10 +358,11 @@ export class KDBDatasource {
                 this.LiveStreamDataDictionary[res.refId][0].push(IDarr[idx]);
                 this.LiveStreamDataDictionary[res.refId][1].push(DATAarr[idx])
             } else {
-                this.LiveStreamDataDictionary[res.refId][1][res_ind].data.push(...DATAarr[res_ind].data)
+                this.LiveStreamDataDictionary[res.refId][1][res_ind].data.push(...DATAarr[idx].data)
             }
         }
         console.log('LIVESTREAMDATADICT', this.LiveStreamDataDictionary)
+        //this.query(templateSrv.options)
     }
 
     connectWS() {
