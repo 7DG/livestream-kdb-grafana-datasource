@@ -16,10 +16,10 @@ subtable:([]
     selectclause:()
     );
 
-subs:((`symbol$())!());                                                           //Will be dict where key is SYMBOL of WS handle, value is that handles' subtable
-                                                                                //E.g. 16 | +`panelID`tablename...!...
-                                                                                //     21 | +`panelID`tablename...!...
-//tabreqs:((`symbol$())!enlist `int$());                                   //Will be dict where key is table name, value is list of handles that want that table
+subs:((`symbol$())!());                                                     //Will be dict where key is SYMBOL of WS handle, value is that handles' subtable
+                                                                            //E.g. 16 | +`panelID`tablename...!...
+                                                                            //     21 | +`panelID`tablename...!...
+//tabreqs:((`symbol$())!enlist `int$());                                    //Will be dict where key is table name, value is list of handles that want that table
 tabreqs:enlist[(`.grafLiveWS.itemforcasting)]!enlist (-1 -2i)
                                                                                 //(E.g. if one user has 3 panels all wanting table `trade, tabreq[`trade] will only have that handle once.)
 
@@ -87,17 +87,18 @@ subend:{[dict]
 updwrap:{[f;t;data]
     f[t;data];                                                                  //Execute old upd
     wsUpdHandles:tabreqs[t];                                                    //Get list of all handles that want this table
-    handleSubtabs:subs[wsUpdHandles];                                           //Get subtable for each of these handles
-    handleSubtabs:{[x;subtab] select from subtab where tablename=x}[t;]each handleSubtabs //Select from each handleSubtabs where the tablename matches the new data
+    handleSubtabs:subs[`$string wsUpdHandles];                                  //Get subtable for each of these handles
+    handleSubtabs:{[x;subtab] select from subtab where tablename=x}[t;]each handleSubtabs; //Select from each handleSubtabs where the tablename matches the new data
+
     outputtablearrays:{[data;subTab]                                            //Serialised data to be sent back
         {[data;subTabRow]
             groupingBool:not subTabRow[`byclause] = `;
-            res:.[{[data;subTabRow] ?[                                          //Error trap wrapped functional select
+            res:.[{[data;subTabRow;grp] ?[                                          //Error trap wrapped functional select
                 data;                                                           // FROM
                 subTabRow[`whereclause];                                        // WHERE
-                $[groupingBool;subTabRow[`byclause];0b];                        // BY 
-                subTabRow[`selectclause]                                        // SELECT
-            ]};(data;subTabRow);{x}];                                           //input + error trap
+                $[grp;subTabRow[`byclause];0b];                        // BY 
+                subTabRow[`selectclause]]                                        // SELECT
+            };(data;subTabRow;groupingBool);{x}];                                           //input + error trap
             if[10h=type res;:-8!"ERROR IN QUERY: ",res];                        //If func select failed, return string with error
 
             $[groupingBool;                                                     //Grouping check
@@ -111,7 +112,7 @@ updwrap:{[f;t;data]
                     {"ERROR IN UNGROUPED TABLE HANDLING: ",x}                   //Ungrouped payload (Error handling)
                     ]
                 ];                                                              
-            
+
             id:subTabRow[`panelID];                                             //queryId
             refId:subTabRow[`refId];                                            //refId
             error:if[10h=type payload;payload;"OK"]                             //Error object
@@ -120,7 +121,7 @@ updwrap:{[f;t;data]
                 $[all 99h=type each payload[1];1b;0b]
             ];
             datarequest:`subscription;
-            :(!) . flip (                                                       //Return dictionary
+            :.dg.viewint:(!) . flip (                                                       //Return dictionary
                 (`error;error);
                 (`refId;refId);
                 (`id;id);
@@ -141,6 +142,6 @@ updwrap:{[f;t;data]
 upd:.grafLiveWS.updwrap[upd;;];                                                 //Wrap upd
 
 .z.wc:{[x]                                                                      //Delete user's subscription info when their websocket closes
-    delete x from `.grafLiveWS.subs;
+    ![`.grafLiveWS.subs;();0b;enlist (`$string[x])];                            //delete (`$string[x]) from `.grafLiveWS.subs;
     .grafLiveWS.tabreqs:{[x;y] y except x}[x;]each .grafLiveWS.tabreqs;
     };

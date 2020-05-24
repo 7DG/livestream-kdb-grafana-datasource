@@ -313,6 +313,7 @@ export class KDBDatasource {
         this.executeAsyncQuery(subReq).then(res => {
             let success = this.responseParser.subscriptionResponse(res);
             if(success) {
+                this.LiveStreamReqDictionary[target.refId] = [];
                 this.LiveStreamReqDictionary[target.refId].push(target);
             }
         });
@@ -330,16 +331,36 @@ export class KDBDatasource {
 
     liveStreamDataReceived(res: any) {
         let IDarr = res.payload[0];
+        console.log('IDARR', IDarr)
         let DATAarr = res.payload[1];
-        for(let idx = 0; idx < IDarr; idx++) {
-            let res_ind = this.LiveStreamDataDictionary[res.refId][0].indexOf(IDarr[idx]);
+        console.log('DATAARR', DATAarr);
+        for(let idx = 0; idx < IDarr.length; idx++) {
+            if (!this.LiveStreamDataDictionary[res.refId]) {
+                this.LiveStreamDataDictionary[res.refId] = [[], []];
+                var res_ind = -1
+            } else {
+                //var res_ind: number = this.LiveStreamDataDictionary[res.refId][0].indexOf(IDarr[idx]);
+                for(let i = 0; i < this.LiveStreamDataDictionary[res.refId][0].length; i++) {
+                    let k = Object.keys(this.LiveStreamDataDictionary[res.refId][0][i])[0];
+                    let v = this.LiveStreamDataDictionary[res.refId][0][i][k];
+                    let nk = Object.keys(IDarr[idx])[0];
+                    let nv = IDarr[idx][nk];
+                    if(k === nk && v === nv) {
+                        var res_ind = i
+                        i = this.LiveStreamDataDictionary[res.refId][0].length
+                    }
+                }
+            };
+            console.log('RES_IND', res_ind)
+            console.log("res.refId", res.refId)
             if (res_ind == -1) {
                 this.LiveStreamDataDictionary[res.refId][0].push(IDarr[idx]);
                 this.LiveStreamDataDictionary[res.refId][1].push(DATAarr[idx])
             } else {
-                this.LiveStreamDataDictionary[res.refId][1][res_ind].data.push(DATAarr[res_ind].data)
+                this.LiveStreamDataDictionary[res.refId][1][res_ind].data.push(...DATAarr[res_ind].data)
             }
         }
+        console.log('LIVESTREAMDATADICT', this.LiveStreamDataDictionary)
     }
 
     connectWS() {
@@ -392,13 +413,17 @@ export class KDBDatasource {
         let _c = this.c;
         let deserializedResult = _c.deserialize(responseObj.data);
         if (!deserializedResult.ID) {
-            return console.log('received malformed data')
         //////////////////////////////// LIVE STREAM DEV CODE ////////////////////////////////
-        /* } else if (deserializedResult.o.datarequest) {
-            if (deserializedResult.o.datarequest == 'subscription') {
-                return this.liveStreamDataReceived(deserializedResult.o);
-            } */
-        //////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////    
+            if (Array.isArray(deserializedResult)) {
+                deserializedResult.forEach(res => {
+                    if(res.datarequest) {
+                        if (res.datarequest == 'subscription') {
+                            return this.liveStreamDataReceived(res);
+                        }
+                    }
+                });
+        //////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////
+            } else return console.log('received malformed data');
         } else if (this.requestSentIDList.indexOf(deserializedResult.ID) === -1) {
             return console.log('received unrequested data');
         } else {
