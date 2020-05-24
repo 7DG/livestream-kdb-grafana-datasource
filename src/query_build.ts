@@ -99,8 +99,20 @@ export class KDBBuilder {
 
         //this.LiveStreamReqDictionary[target.refId] = kdbSubscriptionRequest;
 
-        return ['`subreq', Object.assign({}, kdbSubscriptionRequest)];
-    }
+        return ['`.grafLiveWS.subreq', Object.assign({}, kdbSubscriptionRequest)];
+    };
+
+    buildKdbSubscriptionCancel(target) {
+        class kdbCancelRequest {
+            refId: string;
+            panelId: string;
+        }
+        let kdbCancelRequestDict = new kdbCancelRequest()
+        kdbCancelRequestDict.refId = target.refId;
+        kdbCancelRequestDict.panelId = target.queryId;
+
+        return ['`.grafLiveWS.subend', Object.assign({}, kdbCancelRequestDict)]
+    };
 
     private buildTemporalField(queryDetails) {
         if(queryDetails.queryType == 'selectQuery' && queryDetails.timeColumn) {
@@ -250,7 +262,7 @@ export class KDBBuilder {
                 selectComponent["name"] = selectComponent["col"]
             }
 
-            outSelect[selectComponent["name"]] = [selectComponent["agg"], selectComponent["col"]];
+            outSelect[selectComponent["name"].substr(1)] = [selectComponent["agg"], selectComponent["col"]];
 
         });
         return outSelect;

@@ -2,6 +2,7 @@
 import _ from 'lodash';
 import angular from 'angular';
 import table_model from 'app/core/table_model';
+import { Datasource } from 'dist/module';
 
 export default class ResponseParser {
     constructor(private $q) {
@@ -36,12 +37,16 @@ export default class ResponseParser {
     }
 
     //////////////////////////////// LIVE STREAM DEV CODE ////////////////////////////////
-    liveStreamDataReceived(res: any) {
-
-    }
 
     subscriptionResponse(res: any) {
-        
+        //Ideally alert with green notice that data correctly subscribed
+        if (res.success) {
+            console.log('DATA CORRECTLY SUBSCRIBED/CANCELLED', res);
+            return true
+        } else {
+            console.log('DATA FAILED TO SUBSCRIBE/CANCEL', res);
+            return false
+        };
     }
     //////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////
 
@@ -154,8 +159,32 @@ export default class ResponseParser {
 
             }
         }
+        console.log('MAPGRAPHOUT', dataObjList);
         return dataObjList;
     }
 
+    mapSubscriptionData(keycol, dataList, req) {
+        var dataObjList = [];
+        let grpBy = Object.keys(keycol)[0];
+        let dataKey = keycol[grpBy];
+        let groupingBool = req.subscription.grouping_col != [];
+        let datapointCols = Object.keys(dataList.data[0]);
+        let timeColName = datapointCols[0];
+        let dataColNames = datapointCols.splice(1, datapointCols.length - 1);
+
+        for(var col_ind = 0; col_ind < dataColNames.length; col_ind++) {
+            var series = {}
+            series["refId"] = req.refId;
+            series["meta"] = req;
+            groupingBool ? series["target"] = dataKey + ' - ' + dataColNames[col_ind] : series["target"] = dataColNames[col_ind];
+            series["datapoints"] = []
+            dataList.data.forEach(row => {
+                series["datapoints"].push([row[dataColNames[col_ind]], row[timeColName].valueOf()])
+            })
+            dataObjList.push(series);
+        }
+        console.log('MAPSUBSCRIPTIONOUT', dataObjList);
+        return dataObjList
+    }
 
 }

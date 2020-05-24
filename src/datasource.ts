@@ -5,7 +5,7 @@ import KDBQuery from './kdb_query';
 //import {KDBMetaQuery} from './meta_query';
 import { C } from './c';
 import { KdbRequest } from "./model/kdb-request";
-import { KdbSubscriptionRequest, KdbSubscription } from "./model/kdb-sub-request";
+import { KdbSubscriptionRequest, KdbSubscription,LiveStreamReqDictionary } from "./model/kdb-sub-request";
 import { QueryParam } from "./model/query-param";
 import { QueryDictionary } from "./model/queryDictionary";
 import { ConflationParams } from "./model/conflationParams";
@@ -43,7 +43,7 @@ export class KDBDatasource {
 
     /////////////////////////////// LIVE STREAM DEV CODE /////////////////////////
     LiveStreamDataDictionary: any;
-    LiveStreamReqDictionary: any;
+    LiveStreamReqDictionary: LiveStreamReqDictionary;
 
     /////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////
 
@@ -70,7 +70,7 @@ export class KDBDatasource {
         this.responseReceivedList = [];
 
         this.LiveStreamDataDictionary = {};
-        this.LiveStreamReqDictionary = {};
+        this.LiveStreamReqDictionary = new LiveStreamReqDictionary();
 
         this.url = 'http://' + instanceSettings.jsonData.host;
         if (instanceSettings.jsonData.useAuthentication) {
@@ -124,9 +124,9 @@ export class KDBDatasource {
         return returnobj   
     };
 
-    errorReturn(errorstring: string) {
-        return {payload:[],error:errorstring,success:false}
-    };
+    /* errorReturn(errorstring: string) {
+        return {payload: [], error: errorstring, success: false}
+    }; */
 
     query(options) {
         console.log('QUERY OPTIONS: ', options)
@@ -309,13 +309,23 @@ export class KDBDatasource {
         console.log('SEND SUB REQUEST LOCAL TARGET:', target)
         //Code for creating a new subscription
         let subReq = this.queryBuilder.buildKdbSubscriptionRequest(target);
+        console.log('SUBSCRIPTION REQUEST', subReq);
         this.executeAsyncQuery(subReq).then(res => {
-            this.responseParser.subscriptionResponse(res);
-        })
+            let success = this.responseParser.subscriptionResponse(res);
+            if(success) {
+                this.LiveStreamReqDictionary[target.refId].push(target);
+            }
+        });
     };
-    
+
     cancelSubscription(target) {
+        console.log('SEND SUB CANCEL LOCAL TARGET:', target)
         //Code for cancelling a single subscription
+        let subEnd = this.queryBuilder.buildKdbSubscriptionCancel(target);
+        console.log('SUBSCRIPTION CANCEL REQUEST', subEnd);
+        this.executeAsyncQuery(subEnd).then(res => {
+            let success = this.responseParser.subscriptionResponse(res);
+        });
     }
 
     liveStreamDataReceived(res: any) {
@@ -384,13 +394,10 @@ export class KDBDatasource {
         if (!deserializedResult.ID) {
             return console.log('received malformed data')
         //////////////////////////////// LIVE STREAM DEV CODE ////////////////////////////////
-        } else if (deserializedResult.o.datarequest) {
+        /* } else if (deserializedResult.o.datarequest) {
             if (deserializedResult.o.datarequest == 'subscription') {
                 return this.liveStreamDataReceived(deserializedResult.o);
-            } else if (deserializedResult.o.datarequest == 'subscriptionRequest') {
-                var requestNum = this.requestSentIDList.indexOf(deserializedResult.ID);
-                this.requestSentList[requestNum].resolve(deserializedResult.o)
-            } 
+            } */
         //////////////////////////// END OF LIVE STREAM DEV CODE /////////////////////////////    
         } else if (this.requestSentIDList.indexOf(deserializedResult.ID) === -1) {
             return console.log('received unrequested data');

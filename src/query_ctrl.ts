@@ -7,6 +7,8 @@ import {SqlPart} from './sql_part/sql_part';
 import KDBQuery from './kdb_query';
 import sqlPart from './sql_part';
 import { defaultRowCountLimit } from './model/kdb-request-config';
+import { KDBDatasource } from './datasource'
+import { KDBBuilder } from './query_build';
 //Declaring default constants
 const conflationUnitDefault: string = 'm';
 const conflationDurationDefault: string = "5";
@@ -26,6 +28,7 @@ export class KDBQueryCtrl extends QueryCtrl {
     //High level objects
     queryModel: KDBQuery;
     metaBuilder: KDBMetaQuery;
+    queryBuilder: KDBBuilder
     lastQueryMeta: QueryMeta;
 
     //Query Segments
@@ -59,6 +62,7 @@ export class KDBQueryCtrl extends QueryCtrl {
     liveTimeColumnSegment: any;
     liveMetricColumnSegment: any;
     liveGroupingSegment: any;
+    LiveStreamSubscribeOnly: boolean
     //LiveStream Grouping Parts
     liveSelectParts: SqlPart[][];
     liveGroupParts: SqlPart[];
@@ -83,6 +87,7 @@ export class KDBQueryCtrl extends QueryCtrl {
         //this.target = this.target;98
         this.queryModel = new KDBQuery(this.target, templateSrv, this.panel.scopedVars);
         this.metaBuilder = new KDBMetaQuery(this.target, this.queryModel);
+        this.queryBuilder = new KDBBuilder()
         this.updateProjection();
 
         //if the panel is of a tabular type then only a tabular query is possible
@@ -230,6 +235,7 @@ export class KDBQueryCtrl extends QueryCtrl {
     buildLiveStreamPanel() {
         //default to query builder
         this.liveMetricColumnSegment = this.uiSegmentSrv.newSegment('dummy');
+        this.LiveStreamSubscribeOnly = false;
 
         if(!this.target.liveTimeColumn || this.target.liveTimeColumn == 'Select Field'){
             this.liveTimeColumnSegment = this.uiSegmentSrv.newSegment('Select Field');
@@ -319,6 +325,16 @@ export class KDBQueryCtrl extends QueryCtrl {
         } else {
 
         }
+    }
+
+    subOnlyToggled(target) {
+        console.log('SEND SUB QUERY CTRL REQUEST LOCAL TARGET:', target)
+        if (target.LiveStreamSubscribeOnly) {
+            this.datasource.sendSubscriptionRequest(target);
+        } else {
+            this.datasource.cancelSubscription(target)
+        }
+        this.panelCtrl.refresh()
     }
 
 /////////////////////////////////////////// END OF MOST LIVE STREAM DEV CODE (SEE TYPE DEFINITIONS AT TOP) /////////////////////////////////
