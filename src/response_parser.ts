@@ -164,20 +164,23 @@ export default class ResponseParser {
     }
 
     mapSubscriptionData(keycol, dataList, req) {
+        console.log('mapSubscriptionData: req: ', req);
         var dataObjList = [];
         let grpBy = Object.keys(keycol)[0];
         let dataKey = keycol[grpBy];
-        let groupingBool = req.subscription.grouping_col != [];
+        let groupingBool = req.useLiveGrouping;
         let datapointCols = Object.keys(dataList.data[0]);
         let timeColName = datapointCols[0];
         let dataColNames = datapointCols.splice(1, datapointCols.length - 1);
+        
 
         for(var col_ind = 0; col_ind < dataColNames.length; col_ind++) {
             var series = {}
             series["refId"] = req.refId;
             series["meta"] = req;
             groupingBool ? series["target"] = dataKey + ' - ' + dataColNames[col_ind] : series["target"] = dataColNames[col_ind];
-            series["datapoints"] = []
+            series["datapoints"] = [];
+            console.log('mapSubscriptionData: series: ', series)
             dataList.data.forEach(row => {
                 series["datapoints"].push([row[dataColNames[col_ind]], row[timeColName].valueOf()])
             })

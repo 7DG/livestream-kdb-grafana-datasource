@@ -93,12 +93,16 @@ updwrap:{[f;t;data]
     outputtablearrays:{[data;subTab]                                            //Serialised data to be sent back
         {[data;subTabRow]
             groupingBool:not subTabRow[`byclause] = `;
-            res:.[{[data;subTabRow;grp] ?[                                          //Error trap wrapped functional select
+            //selectTime:$[subTabRow[`useConflation];                           //For when conflation is supported
+            //    ()!();                                                        //For when conflation is supported
+            //    enlist[subTabRow[`temporal_col]]!enlist (::;subTabRow[`temporal_col])];       //For when conflation is supported
+            selectTime:enlist[subTabRow[`temporal_col]]!enlist (::;subTabRow[`temporal_col]);   //Until then use this
+            res:.[{[data;subTabRow;grp;slctT] ?[                                          //Error trap wrapped functional select
                 data;                                                           // FROM
                 subTabRow[`whereclause];                                        // WHERE
-                $[grp;subTabRow[`byclause];0b];                        // BY 
-                subTabRow[`selectclause]]                                        // SELECT
-            };(data;subTabRow;groupingBool);{x}];                                           //input + error trap
+                $[grp;subTabRow[`byclause];0b];                                 // BY 
+                slctT,subTabRow[`selectclause]]                                 // SELECT
+            };(data;subTabRow;groupingBool;selectTime);{x}];                                           //input + error trap
             if[10h=type res;:-8!"ERROR IN QUERY: ",res];                        //If func select failed, return string with error
 
             $[groupingBool;                                                     //Grouping check

@@ -199,7 +199,7 @@ export class KDBDatasource {
             let keycol = this.LiveStreamDataDictionary[requestRefId][0][d];
             let datalist = this.LiveStreamDataDictionary[requestRefId][1][d];
             let req = this.LiveStreamReqDictionary[requestRefId][d];
-            dataArr.push(this.responseParser.mapSubscriptionData(keycol, datalist, req))
+            dataArr.push(...this.responseParser.mapSubscriptionData(keycol, datalist, req))
         }
         return dataArr
     }
