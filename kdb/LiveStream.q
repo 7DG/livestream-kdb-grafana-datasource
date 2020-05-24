@@ -1,12 +1,14 @@
 //Code for using LiveStream query with Grafana adaptor
+upd:{[t;d] t insert d} /////EXAMPLE UPD STATEMENT
 
 \d .grafLiveWS
 
-subtable:([panelID:`long$()]        //Each user has their own subtable, each panel is one entry.
-    refId:`sym$();                  //refId of query in panel
-    tablename:`sym$();              //name of table selecting from
+subtable:([]
+    panelID:`long$();        //Each user has their own subtable, each panel is one entry.
+    refId:`symbol$();                  //refId of query in panel
+    tablename:`symbol$();              //name of table selecting from
     //temporalbool:`boolean$();
-    temporal_col:`sym$();           //name of temporal column
+    temporal_col:`symbol$();           //name of temporal column
     //temporalfrom:`timestamp$();
     //temporalto:`timestamp$();
     whereclause:();                 //where clause 
@@ -14,17 +16,19 @@ subtable:([panelID:`long$()]        //Each user has their own subtable, each pan
     selectclause:()
     );
 
-subs:(`symbol$()!());               //Will be dict where key is SYMBOL of WS handle, value is that handles' subtable
-                                    //E.g. 16 | +`panelID`tablename...!...
-                                    //     21 | +`panelID`tablename...!...
-tabreqs:(`symbol$()!());            //Will be dict where key is table name, value is list of handles that want that table
-                                    //(E.g. if one user has 3 panels all wanting table `trade, tabreq[`trade] will only have that handle once.)
+subs:((`symbol$())!());                                                           //Will be dict where key is SYMBOL of WS handle, value is that handles' subtable
+                                                                                //E.g. 16 | +`panelID`tablename...!...
+                                                                                //     21 | +`panelID`tablename...!...
+//tabreqs:((`symbol$())!enlist `int$());                                   //Will be dict where key is table name, value is list of handles that want that table
+tabreqs:enlist[(`.grafLiveWS.itemforcasting)]!enlist (-1 -2i)
+                                                                                //(E.g. if one user has 3 panels all wanting table `trade, tabreq[`trade] will only have that handle once.)
 
 selectReader:{[x] :(value first x;last x)};
 
 subreq:{[dict]
-    reqid:"J"$raze string .Q.an ? dict[`subscription;`panelId];
-    refId:dict[`refId]
+    .grafLiveWS.DEVREQ: dict;
+    reqid:"J"$raze string .Q.an ? dict[`panelId];
+    refId:`$dict[`refId];
     subentry:(
         reqid;
         refId;
@@ -35,14 +39,16 @@ subreq:{[dict]
         $[`grouping_col in key dict[`subscription];dict[`subscription;`grouping_col];`];
         selectReader each dict[`subscription;`select_cols]
     );
+    .grafLiveWS.DEVSUB:subentry;
     if[not (`$string[.z.w]) in key .grafLiveWS.subs;                            //if[first sub from this handle; create a subtable and add to .grafLiveWS.subs]
         .grafLiveWS.subs[`$string .z.w]:.grafLiveWS.subtable];
+
     subtabinsert:.[insert;
         (`$".grafLiveWS.subs.",string[.z.w];subentry);{"ERROR DURING SUBSCRIPTION: ",x}];
     newsubtab:.grafLiveWS.subs[`$string .z.w];
     reqtabs:exec distinct tablename from newsubtab;
     {[x;y]                                                                      //Update all tabreqs that this handle is subscribed to
-        .grafLiveWS.tabreqs[x],:y;
+        .grafLiveWS.tabreqs[x]:.grafLiveWS.tabreqs[x],y;
         .grafLiveWS.tabreqs[x]:distinct .grafLiveWS.tabreqs[x];
         }[;.z.w]each reqtabs;
     
@@ -55,13 +61,34 @@ subreq:{[dict]
                 (`id;reqid);
                 (`success;success);
                 (`datarequest;datarequest)
+            );
+    };
+
+subend:{[dict]
+    .grafLiveWS.DEVEND:dict;
+    scopedPanelId:"J"$raze string .Q.an ? dict[`panelId];
+    scopedRefId:`$dict[`refId];
+    subtabdelete:.[{[x;y;z]
+        delete from z where ((refId=x) and (panelID=y))};
+        (scopedRefId;scopedPanelId;`$".grafLiveWS.subs.",string[.z.w]);
+        {"ERROR IN REMOVING SUBSCRIPTION: ",x}];
+    success:$[10h=type subtabdelete;0b;1b];
+    error:$[not success;subtabdelete;"OK"];
+    datarequest:`subscriptionRequest;
+    :(!) . flip (                                                       //Return dictionary
+                (`error;error);
+                (`refId;scopedRefId);
+                (`id;scopedPanelId);
+                (`success;success);
+                (`datarequest;datarequest)
+            );
     };
 
 updwrap:{[f;t;data]
     f[t;data];                                                                  //Execute old upd
     wsUpdHandles:tabreqs[t];                                                    //Get list of all handles that want this table
-    handleSubtabs:subs[wsUpd];                                                  //Get subtable for each of these handles
-    handleSubtabs:{[t;x] select from x where tablename=t}[t;]each handleSubtabs //Select from each handleSubtabs where the tablename matches the new data
+    handleSubtabs:subs[wsUpdHandles];                                           //Get subtable for each of these handles
+    handleSubtabs:{[x;subtab] select from subtab where tablename=x}[t;]each handleSubtabs //Select from each handleSubtabs where the tablename matches the new data
     outputtablearrays:{[data;subTab]                                            //Serialised data to be sent back
         {[data;subTabRow]
             groupingBool:not subTabRow[`byclause] = `;
